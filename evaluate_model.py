@@ -21,27 +21,30 @@ from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 def run():
     n = 5
     width, height = 8, 8
-    model_file_1 = 'best_policy_8_8_5.model'
-    model_file_2 = 'best_policy_885_6050.model'
+    model_file_1 = 'best_policy_885_2_50.model'
+    model_file_2 = 'best_policy_885_2_10500.model'
     try:
         board = Board(width=width, height=height, n_in_row=n)
         game = Game(board)
-
-        try:
-            policy_param_1 = pickle.load(open(model_file_1, 'rb'))
-        except:
-            policy_param_1 = pickle.load(open(model_file_1, 'rb'),
-                                       encoding='bytes')  # To support python3
-        best_policy_1 = PolicyValueNetNumpy(width, height, policy_param_1)
-        mcts_player_1 = MCTSPlayer(best_policy_1.policy_value_fn,
-                                 c_puct=5,
-                                 n_playout=400)  # set larger n_playout for better performance
-        #second player and policy
+        
+        # for Python3
+#         try:
+#             policy_param_1 = pickle.load(open(model_file_1, 'rb'))
+#         except:
+#             policy_param_1 = pickle.load(open(model_file_1, 'rb'),
+#                                        encoding='bytes')
+#             #second player and policy
 #         try:
 #             policy_param_2 = pickle.load(open(model_file_2, 'rb'))
 #         except:
 #             policy_param_2 = pickle.load(open(model_file_2, 'rb'),
-#                                        encoding='bytes')  # To support python3
+#                                        encoding='bytes')
+        # for pyTorch
+        best_policy_1 = PolicyValueNet(width, height, model_file_1, use_gpu=True)
+        mcts_player_1 = MCTSPlayer(best_policy_1.policy_value_fn,
+                                 c_puct=5,
+                                 n_playout=400)  # set larger n_playout for better performance
+        
         best_policy_2 = PolicyValueNet(width, height, model_file_2, use_gpu=True)
         mcts_player_2 = MCTSPlayer(best_policy_2.policy_value_fn,
                                  c_puct=5,
