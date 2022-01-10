@@ -6,11 +6,12 @@ Input your move in the format: 2,3
 @author: Junxiao Song
 """
 
+from __future__ import print_function
+import os
 import random
 import itertools
 import math
 
-from __future__ import print_function
 import pickle
 from trueskill import Rating, quality_1vs1, rate_1vs1, rate
 
@@ -20,12 +21,25 @@ from mcts_alphaZero import MCTSPlayer
 from policy_value_net_numpy import PolicyValueNetNumpy
 from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 
-
-def run():
+def readModel():
+    
+    '''save model name and model file name to a dictionary'''
+    
+    model_path = os.getcwd() + '/PyTorch_models'
+    model_list = [files for root, dirs, files in os.walk(model_path)][0] # have two lists, second is empty
+    model_dict = {}
+    for model in model_list:
+        model_dict['model' + '_' + model.split('.')[0].split('_')[-1]] = model
+    return model_dict
+    
+def compete(model_file_1, model_file_2):
+    
+    '''compare any two models'''
+    
+    # build the board
     n = 5
     width, height = 8, 8
-    model_file_1 = 'best_policy_885_2_50.model'
-    model_file_2 = 'best_policy_885_2_10500.model'
+
     try:
         board = Board(width=width, height=height, n_in_row=n)
         game = Game(board)
@@ -41,36 +55,40 @@ def run():
                                  c_puct=5,
                                  n_playout=400)  # set larger n_playout for better performance
 
-        # set start_player=0 for human first
-        for i in range(5):  
-            winner = game.start_play(mcts_player_1, mcts_player_2, start_player=1, is_shown=0)
-            print('winner is {}'.format(winner))
+        winner = game.start_play(mcts_player_1, mcts_player_2, start_player=1, is_shown=0)
+        return winner
+#         print('winner is {}'.format(winner))
             
-            
-        
     except KeyboardInterrupt:
         print('\n\rquit')
         
-    def win_probability(team1, team2):
-        delta_mu = sum(r.mu for r in team1) - sum(r.mu for r in team2)
-        sum_sigma = sum(r.sigma ** 2 for r in itertools.chain(team1, team2))
-        size = len(team1) + len(team2)
-        denom = math.sqrt(size * (1 * 1) + sum_sigma)
-        ts = trueskill.global_env()
-        return ts.cdf(delta_mu / denom)
     
-        # models = [['model{} weights'.format(i) , Rating()] for i in range(15)]
+def run():
+    model_dict = readModel()
+    test_models = [[model, Rating()] for model in model_dict.values()]
+    
+    for _ in range(100):
+        model_1 = random.choice(test_models)
+        model_2 = sorted([(quality_1vs1(model_1[1], m[1]), m) for m in test_models if m[0] != model_1[0]])[-1][1]
         
-        for _ in range(100):
-        player1 = random.choice(models)
-        player2 = sorted([(quality_1vs1(player1[1], m[1]), m) for m in models if m[0] != player1[0]])[-1][1]
-        #print(player1[0], player2[0])
-        player1_wins = random.random() < win_probability([player1[1]], [player2[1]])
-        if player1_wins:
-            player1[1], player2[1] = rate_1vs1(player1[1], player2[1])
-        else:
-            player2[1], player1[1] = rate_1vs1(player2[1], player1[1])
+        model_file_1 = os.getcwd() + '/PyTorch_models/' + model_1[0]
+        model_file_2 = os.getcwd() + '/PyTorch_models/' + model_2[0]
+        
+        winner = compete(model_file_1, model_file_2)
+        model1_wins = winner == 1
+        model2_wins = winner == 2
+        tie = winner == -1
 
+        if model1_wins:
+            model_1[1], model_2[1] = rate_1vs1(model_1[1], model_2[1])
+        if model2_wins:
+            model_2[1], model_1[1] = rate_1vs1(model_2[1], model_1[1])
+        if tie:
+            model_1[1], model_2[1] = rate_1vs1(model_1[1], model_2[1], drawn=True)
+        
+        print('game {} completed'.format(_))
+        
+    return test_models
 
 if __name__ == '__main__':
     run()
