@@ -67,7 +67,7 @@ def run():
     model_dict = readModel()
     test_models = [[model, Rating()] for model in model_dict.values()]
     
-    for _ in range(100):
+    for _ in range(2):
         model_1 = random.choice(test_models)
         model_2 = sorted([(quality_1vs1(model_1[1], m[1]), m) for m in test_models if m[0] != model_1[0]])[-1][1]
         
@@ -87,7 +87,8 @@ def run():
             model_1[1], model_2[1] = rate_1vs1(model_1[1], model_2[1], drawn=True)
         
         print('game {} completed'.format(_))
-        
+    
+    print(test_models)
     return test_models
 
 if __name__ == '__main__':
