@@ -65,31 +65,43 @@ def compete(model_file_1, model_file_2):
     
 def run():
     model_dict = readModel()
-    test_models = [[model, Rating()] for model in model_dict.values()]
+    test_models = [[0, random.random(), model_name, Rating()] for model_name in model_dict.keys()]
     
-    for _ in range(100):
-        model_1 = random.choice(test_models)
-        model_2 = sorted([(quality_1vs1(model_1[1], m[1]), m) for m in test_models if m[0] != model_1[0]])[-1][1]
+    for i in range(200):
         
-        model_file_1 = os.getcwd() + '/PyTorch_models/' + model_1[0]
-        model_file_2 = os.getcwd() + '/PyTorch_models/' + model_2[0]
+#         random.shuffle(test_models)
+        test_models = sorted(test_models)
+        model_1 = test_models[0]
+        model_2 = test_models[1]
+#         model_1 = random.choice(test_models)
+#         model_2 = sorted([(quality_1vs1(model_1[1], m[1]), m) for m in test_models if m[0] != model_1[0]])[-1][1]
+        
+        # count the number of games each model has played
+        model_1[0] += 1
+        model_2[0] += 1
+        
+        # find relevant model files
+        model_file_1 = os.getcwd() + '/PyTorch_models/' + model_dict[model_1[2]]
+        model_file_2 = os.getcwd() + '/PyTorch_models/' + model_dict[model_2[2]]
         
         winner = compete(model_file_1, model_file_2)
-        model1_wins = winner == 1
-        model2_wins = winner == 2
-        tie = winner == -1
+#         model1_wins = winner == 1
+#         model2_wins = winner == 2
+#         tie = winner == -1
 
-        if model1_wins:
-            model_1[1], model_2[1] = rate_1vs1(model_1[1], model_2[1])
-        if model2_wins:
-            model_2[1], model_1[1] = rate_1vs1(model_2[1], model_1[1])
-        if tie:
-            model_1[1], model_2[1] = rate_1vs1(model_1[1], model_2[1], drawn=True)
+        if winner == 1:
+            model_1[-1], model_2[-1] = rate_1vs1(model_1[-1], model_2[-1])
+        elif winner == 2:
+            model_2[-1], model_1[-1] = rate_1vs1(model_2[-1], model_1[-1])
+        elif winner == -1:
+            model_1[-1], model_2[-1] = rate_1vs1(model_1[-1], model_2[-1], drawn=True)
+        else:
+            print("unknown winner type ", winner)
         
-        print('game {} completed'.format(_))
+        print('game {} completed: {} vs {}, winner is {}'.format(i, model_1[2], model_2[2], winner))
     
     print(test_models)
-    return test_models
+    return sorted(test_models)
 
 if __name__ == '__main__':
     run()
