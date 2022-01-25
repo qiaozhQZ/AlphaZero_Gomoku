@@ -48,12 +48,14 @@ class Net(nn.Module):
         # action policy layers
         x_act = F.relu(self.act_conv1(x))
         x_act = x_act.view(-1, 4*self.board_width*self.board_height)
-        x_act = F.log_softmax(self.act_fc1(x_act))
+        x_act = F.log_softmax(self.act_fc1(x_act), dim=-1) # add dim= -1
         # state value layers
         x_val = F.relu(self.val_conv1(x))
         x_val = x_val.view(-1, 2*self.board_width*self.board_height)
         x_val = F.relu(self.val_fc1(x_val))
-        x_val = F.tanh(self.val_fc2(x_val))
+#         x_val = torch.tanh(self.val_fc2(x_val)) # use torch.tanh
+        x_val = self.val_fc2(x_val).tanh() # use torch.tanh
+
         return x_act, x_val
 
 
