@@ -8,9 +8,11 @@ Input your move in the format: 2,3
 
 from __future__ import print_function
 import os
+import sys
 import random
 import itertools
 import math
+import pandas as pd
 
 import pickle
 from trueskill import Rating, quality_1vs1, rate_1vs1, rate
@@ -62,33 +64,68 @@ def compete(model_file_1, model_file_2):
     except KeyboardInterrupt:
         print('\n\rquit')
         
+def run_all():
+    model_dict = readModel()
+    game_rst = {k: [] for k in ['model_1', 'model_2', 'winner']}
     
-def run():
+    for i in range(10):
+        game_cnt = 0
+        for model_1 in model_dict.keys():
+            for model_2 in model_dict.keys():
+                if model_1 == model_2:
+                    continue
+                
+                game_cnt += 1
+                model_file_1 = os.getcwd() + '/PyTorch_models/' + model_dict[model_1]
+                model_file_2 = os.getcwd() + '/PyTorch_models/' + model_dict[model_2]
+                
+                winner = compete(model_file_1, model_file_2)
+                game_rst['model_1'].append(model_1)
+                game_rst['model_2'].append(model_2)
+                game_rst['winner'].append(winner)
+                
+                print('game {} of batch {} completed: {} vs {}, winner is {}'.format(game_cnt, i+1, model_1, model_2, winner))
+        # save at the end of each loop
+        game_df = pd.DataFrame(game_rst)
+        game_df.to_csv(os.getcwd() + '/' + 'game_rst_{}.txt'.format(i), sep = '\t')
+                
+    game_df = pd.DataFrame(game_rst)
+    game_df.to_csv(os.getcwd() + '/' + 'game_rst.txt', sep = '\t')
+
+        
+def run_epoch():
     model_dict = readModel()
     test_models = [[0, random.random(), model_name, Rating()] for model_name in model_dict.keys()]
+    game_rst = {k: [] for k in ['model_1', 'model_2', 'winner']}
     
-    for i in range(200):
+    for i in range(10):
         
-#         random.shuffle(test_models)
+        test_models = [[model[0], random.random(), model[2], model[3]] for model in test_models]
+        random.shuffle(test_models)
         test_models = sorted(test_models)
+        
         model_1 = test_models[0]
         model_2 = test_models[1]
+        
+        # randomly choose model_1, and choose model_2 that has the closest mu to model_2
 #         model_1 = random.choice(test_models)
 #         model_2 = sorted([(quality_1vs1(model_1[1], m[1]), m) for m in test_models if m[0] != model_1[0]])[-1][1]
-        
+
         # count the number of games each model has played
         model_1[0] += 1
         model_2[0] += 1
-        
-        # find relevant model files
+
+        #find relevant model files
         model_file_1 = os.getcwd() + '/PyTorch_models/' + model_dict[model_1[2]]
         model_file_2 = os.getcwd() + '/PyTorch_models/' + model_dict[model_2[2]]
-        
+                
+        # run the game and save the game information to a dictionary
         winner = compete(model_file_1, model_file_2)
-#         model1_wins = winner == 1
-#         model2_wins = winner == 2
-#         tie = winner == -1
-
+        game_rst['model_1'].append(model_1[2])
+        game_rst['model_2'].append(model_2[2])
+        game_rst['winner'].append(winner)        
+        
+        # true skill update
         if winner == 1:
             model_1[-1], model_2[-1] = rate_1vs1(model_1[-1], model_2[-1])
         elif winner == 2:
@@ -97,11 +134,16 @@ def run():
             model_1[-1], model_2[-1] = rate_1vs1(model_1[-1], model_2[-1], drawn=True)
         else:
             print("unknown winner type ", winner)
-        
+
         print('game {} completed: {} vs {}, winner is {}'.format(i, model_1[2], model_2[2], winner))
-    
+        
     print(test_models)
-    return sorted(test_models)
+    test_models_df = pd.DataFrame(sorted(test_models), columns = ['game_count', 'random_number', 'model_name', 'true_skill'])
+    test_models_df.to_csv(os.getcwd() + '/' + 'test_models.txt', sep = '\t')
+    game_df = pd.DataFrame(game_rst)
+    game_df.to_csv(os.getcwd() + '/' + 'game_rst.txt', sep = '\t')
+
 
 if __name__ == '__main__':
-    run()
+    run_all()
+#     run_epoch()
