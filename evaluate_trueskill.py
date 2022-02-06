@@ -8,6 +8,7 @@ Input your move in the format: 2,3
 
 from __future__ import print_function
 import os
+import re
 import sys
 import random
 import itertools
@@ -27,11 +28,14 @@ def readModel():
     
     '''save model name and model file name to a dictionary'''
     
-    model_path = os.getcwd() + '/PyTorch_models'
-    model_list = [files for root, dirs, files in os.walk(model_path)][0] # have two lists, second is empty
+    model_dir = 'batch100_mini2048_model'
+    model_path = os.getcwd() + '/' + model_dir
+#     model_list = [files for root, dirs, files in os.walk(model_path)][0] # have two lists, second is empty
+    model_list = [f for f in os.listdir(model_path) if re.match('\d*_best.*', f)] # only take the best policy models
     model_dict = {}
     for model in model_list:
-        model_dict['model' + '_' + model.split('.')[0].split('_')[-1]] = model
+#         model_dict['model' + '_' + model.split('.')[0].split('_')[-1]] = model # PyTorch_model
+        model_dict['model' + '_' + model.split('.')[0].split('_')[0]] = model # batch100_mini2048_model
     return model_dict
     
 def compete(model_file_1, model_file_2):
@@ -76,8 +80,8 @@ def run_all():
                     continue
                 
                 game_cnt += 1
-                model_file_1 = os.getcwd() + '/PyTorch_models/' + model_dict[model_1]
-                model_file_2 = os.getcwd() + '/PyTorch_models/' + model_dict[model_2]
+                model_file_1 = model_path + '/' + model_dict[model_1]
+                model_file_2 = model_path + '/' + model_dict[model_2]
                 
                 winner = compete(model_file_1, model_file_2)
                 game_rst['model_1'].append(model_1)
