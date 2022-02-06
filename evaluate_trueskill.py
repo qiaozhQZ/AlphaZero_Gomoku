@@ -35,7 +35,7 @@ def readModel():
     model_dict = {}
     for model in model_list:
 #         model_dict['model' + '_' + model.split('.')[0].split('_')[-1]] = model # PyTorch_model
-        model_dict['model' + '_' + model.split('.')[0].split('_')[0]] = model # batch100_mini2048_model
+        model_dict['model' + '_' + model.split('_')[0]] = model # batch100_mini2048_model
     return model_dict
     
 def compete(model_file_1, model_file_2):
@@ -91,7 +91,7 @@ def run_all():
                 print('game {} of batch {} completed: {} vs {}, winner is {}'.format(game_cnt, i+1, model_1, model_2, winner))
         # save at the end of each loop
         game_df = pd.DataFrame(game_rst)
-        game_df.to_csv(os.getcwd() + '/' + 'game_rst_{}.txt'.format(i), sep = '\t')
+        game_df.to_csv(os.getcwd() + '/' + 'game_rst_{}.txt'.format(i+1), sep = '\t')
                 
     game_df = pd.DataFrame(game_rst)
     game_df.to_csv(os.getcwd() + '/' + 'game_rst.txt', sep = '\t')
