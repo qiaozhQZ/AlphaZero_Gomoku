@@ -6,6 +6,7 @@ An implementation of the training pipeline of AlphaZero for Gomoku
 """
 
 from __future__ import print_function
+import os
 import random
 import numpy as np
 from multiprocessing import Pool
@@ -37,12 +38,12 @@ class TrainPipeline():
         self.n_playout = 400  # num of simulations for each move
         self.c_puct = 5
         self.buffer_size = 10000
-        self.batch_size = 512  # mini-batch size for training
+        self.batch_size = 2048  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
         self.play_batch_size = 1
         self.epochs = 5  # num of train_steps for each update
         self.kl_targ = 0.02
-        self.check_freq = 50
+        self.check_freq = 150 # num of games in a batch
         self.game_batch_num = 3000 #maximun games played
         self.best_win_ratio = 0.0
         # num of simulations used for the pure mcts, which is used as
@@ -150,31 +151,36 @@ class TrainPipeline():
                         explained_var_new))
         return loss, entropy
 
-    def policy_evaluate(self, n_games=10):
+    def policy_evaluate(self, n_games=10): # set n_games to 0
         """
         Evaluate the trained policy by playing against the pure MCTS player
         Note: this is only for monitoring the progress of training
         """
+        
+        if n_game == 0:
+            return 0.0
+        
         current_mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                          c_puct=self.c_puct,
                                          n_playout=self.n_playout)
 
         # make a new MCTS player
-        best_policy_value_net = PolicyValueNet(self.board_width,
-                                               self.board_height,
-                                               model_file='./best_policy.model',
-                                              use_gpu=True)
+#         best_policy_value_net = PolicyValueNet(self.board_width,
+#                                                self.board_height,
+#                                                model_file='./best_policy.model',
+#                                               use_gpu=True)
 
-        best_mcts_player = MCTSPlayer(best_policy_value_net.policy_value_fn,
-                                      c_puct=self.c_puct,
-                                      n_playout=self.n_playout)
+#         best_mcts_player = MCTSPlayer(best_policy_value_net.policy_value_fn,
+#                                       c_puct=self.c_puct,
+#                                       n_playout=self.n_playout)
         
         pure_mcts_player = MCTS_Pure(c_puct=5,
                                      n_playout=self.pure_mcts_playout_num)
         win_cnt = defaultdict(int)
         for i in range(n_games):
             winner = self.game.start_play(current_mcts_player,
-                                          best_mcts_player,
+                                          pure_mcts_player,
+#                                           best_mcts_player,
                                           start_player=i % 2,
                                           is_shown=0)
             win_cnt[winner] += 1
@@ -186,6 +192,10 @@ class TrainPipeline():
 
     def run(self):
         """run the training pipeline"""
+        # make directory to save policy models
+        dir_path = os.getcwd() + '/' + 'batch{}_mini{}_model'.format(self.check_freq, self.batch_size)
+        os.mkdir(dir_path)
+        os.chdir(dir_path)
         try:
             i = 0 #start
             while True: #keep training
@@ -200,21 +210,22 @@ class TrainPipeline():
                 if (i+1) % self.check_freq == 0:
                     print("current self-play batch: {}".format(i+1))
                     win_ratio = self.policy_evaluate()
-                    self.policy_value_net.save_model('./current_policy.model')
-                    if win_ratio > 0.5: #self.best_win_ratio:
+                    self.policy_value_net.save_model(os.getcwd() + '/' + '{}_current_policy.model'.format(i+1))
+                    if win_ratio > 0.5 and win_ratio > self.best_win_ratio: # default is > self.best_win_ratio
                         print("New best policy!!!!!!!!")
                         self.best_win_ratio = win_ratio
                         # update the best_policy
-                        self.policy_value_net.save_model('./best_policy.model')
-#                         if (self.best_win_ratio == 1.0 and
-#                                 self.pure_mcts_playout_num < 5000):
-#                             self.pure_mcts_playout_num += 1000
-#                             self.best_win_ratio = 0.0
+                        self.policy_value_net.save_model(os.getcwd() + '/' + '{}_best_policy.model'.format(i+1))
+                        if (self.best_win_ratio == 1.0 and
+                                self.pure_mcts_playout_num < 5000):
+                            self.pure_mcts_playout_num += 1000
+                            self.best_win_ratio = 0.0
                 i += 1 #increase batch number
         except KeyboardInterrupt:
             print('\n\rquit')
 
 
 if __name__ == '__main__':
-    training_pipeline = TrainPipeline('./best_policy_885_6050.model')
+#     training_pipeline = TrainPipeline('./best_policy_885_6050.model')
+    training_pipeline = TrainPipeline()
     training_pipeline.run()
