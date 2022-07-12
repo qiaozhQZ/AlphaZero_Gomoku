@@ -76,7 +76,10 @@ class PolicyValueNet():
                                     weight_decay=self.l2_const)
 
         if model_file:
-            net_params = torch.load(model_file)
+            if use_gpu == True:
+                net_params = torch.load(model_file)
+            else:
+                net_params = torch.load(model_file, map_location=torch.device('cpu'))
             self.policy_value_net.load_state_dict(net_params)
 
     def policy_value(self, state_batch):
