@@ -21,6 +21,14 @@ class Board(object):
         self.n_in_row = int(kwargs.get('n_in_row', 5))
         self.players = [1, 2]  # player1 and player2
 
+    def __hash__(self) -> int:
+        return hash(frozenset(self.states.items()))
+    
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Board):
+            return False
+        return self.states == other.states
+
     def init_board(self, start_player=0):
         if self.width < self.n_in_row or self.height < self.n_in_row:
             raise Exception('board width and height can not be '
