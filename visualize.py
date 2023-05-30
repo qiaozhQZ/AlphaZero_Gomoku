@@ -55,12 +55,12 @@ class TrainPipeline():
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
                                                    model_file=init_model,
-                                                  use_gpu=False)
+                                                  use_gpu=True)
         else:
             # start training from a new policy-value net
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
-                                                  use_gpu=False)
+                                                  use_gpu=True)
         self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                       c_puct=self.c_puct,
                                       n_playout=self.n_playout,
@@ -99,6 +99,26 @@ class TrainPipeline():
         for i in range(n_games):
             winner, play_data = self.game.start_self_play(self.mcts_player,
                                                           temp=self.temp)
+            # write mcts_prob to txt
+            mcts_prob = (list(play_data)[1])
+            path_file = os.getcwd() + "/" +"mcts_prob.txt"
+            if os.path.exists(path_file):
+                f = open(path_file, "w")
+                print(mcts_prob)
+                for board_prob in mcts_prob:
+                    # write each item on a new line
+                    line = ' '.join(str(board) for board in board_prob)
+                    f.write(line + '\n')
+            else:
+                with open(path_file, "w") as f:
+                    print(mcts_prob)
+                    for board_prob in mcts_prob:
+                        # write each item on a new line
+                        line = ' '.join(str(board) for board in board_prob)
+                        f.write(line + '\n')
+                    f.close
+                    print('Done')
+
 #             winner, play_data = roll_out[i] # reading the data from roll_out
             play_data = list(play_data)[:]
             self.episode_len = len(play_data)
@@ -158,7 +178,7 @@ class TrainPipeline():
         Note: this is only for monitoring the progress of training
         """
         
-        if n_game == 0:
+        if n_games == 0:
             return 0.0
         
         current_mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
@@ -203,9 +223,8 @@ class TrainPipeline():
         os.chdir(dir_path)
         try:
             i = 0 #start
-            print(i)
             while True: #keep training
-#             for i in range(self.game_batch_num):
+            # for i in range(self.game_batch_num):
                 self.collect_selfplay_data(self.play_batch_size)
                 print("batch i:{}, episode_len:{}".format(
                         i+1, self.episode_len))
@@ -217,7 +236,8 @@ class TrainPipeline():
                     print("current self-play batch: {}".format(i+1))
                     win_ratio = self.policy_evaluate()
                     self.policy_value_net.save_model(os.getcwd() + '/' + '{}_current_policy.model'.format(i+1))
-                    if win_ratio > 0.5 and win_ratio > self.best_win_ratio: # default is > self.best_win_ratio
+                    if win_ratio > 0.5 and win_ratio > self.best_win_ratio:
+                    # if win_ratio > self.best_win_ratio:
                         print("New best policy!!!!!!!!")
                         self.best_win_ratio = win_ratio
                         # update the best_policy
