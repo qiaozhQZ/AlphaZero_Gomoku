@@ -8,7 +8,9 @@ An implementation of the training pipeline of AlphaZero for Gomoku
 from __future__ import print_function
 import os
 import random
+import datetime
 import numpy as np
+import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from functools import partial
 from collections import defaultdict, deque
@@ -157,7 +159,8 @@ class TrainPipeline():
         Note: this is only for monitoring the progress of training
         """
         
-        if n_game == 0:
+        # TODO why?
+        if n_games == 0:
             return 0.0
         
         current_mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
@@ -189,16 +192,55 @@ class TrainPipeline():
                 self.pure_mcts_playout_num,
                 win_cnt[1], win_cnt[2], win_cnt[-1]))
         return win_ratio
+    
+    def render_probs_empty(self, i, save=False):
+
+        path = os.getcwd() + '/' + 'board_heatmap'
+        if not os.path.exists(path):
+            os.mkdir(path)
+        empty_board = Board()
+        empty_board.init_board()
+        acts, move_probs = self.mcts_player.get_action(empty_board, return_prob=1)
+        
+        fig, ax = plt.subplots()
+        im = ax.imshow(move_probs.reshape((8,8)))
+
+        row_label = [0 + i*8 for i in range(8)]
+        col_label = [56 + i for i in range(8)]
+        ax.set_yticks(np.arange(len(row_label)), labels=row_label)
+        ax.set_xticks(np.arange(len(col_label)), labels=col_label)
+
+        for row in range(8):
+            for col in range(8):
+                text = ax.text(col, row, round(move_probs.reshape((8,8))[row, col], 3),
+                               ha="center", va="center", color="w")
+
+        ax.set_title("batch_{}".format(i))
+        fig.tight_layout()
+        print("Move Probs Shape:", move_probs.shape)
+        print(move_probs.reshape((8,8)))
+        if path:
+            # print("current_batch", i)
+            fig.savefig(path + "/batch_{}".format(i) + ".png")
+        else:
+            fig.show()
+        plt.close(fig)
 
     def run(self):
         """run the training pipeline"""
         # make directory to save policy models
-        dir_path = os.getcwd() + '/' + 'batch{}_mini{}_model'.format(self.check_freq, self.batch_size)
-        os.mkdir(dir_path)
-        os.chdir(dir_path)
+        # dir_path = os.getcwd() + '/' + 'batch{}_mini{}_model'.format(self.check_freq, self.batch_size)
+        datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        path = os.getcwd() + "/" + "testing_only_" + datestring
+        
+        if not os.path.exists(path):
+            os.mkdir(path)
+        os.chdir(path)
         try:
             i = 0 #start
             while True: #keep training
+
+                self.render_probs_empty(i, save=True)
 #             for i in range(self.game_batch_num):
                 self.collect_selfplay_data(self.play_batch_size)
                 print("batch i:{}, episode_len:{}".format(
