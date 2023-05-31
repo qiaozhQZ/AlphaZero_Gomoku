@@ -8,6 +8,7 @@ An implementation of the training pipeline of AlphaZero for Gomoku
 from __future__ import print_function
 import os
 import random
+import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
@@ -158,7 +159,8 @@ class TrainPipeline():
         Note: this is only for monitoring the progress of training
         """
         
-        if n_game == 0:
+        # TODO why?
+        if n_games == 0:
             return 0.0
         
         current_mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
@@ -208,16 +210,17 @@ class TrainPipeline():
         ax.set_yticks(np.arange(len(row_label)), labels=row_label)
         ax.set_xticks(np.arange(len(col_label)), labels=col_label)
 
-        # for i in range(8):
-        #     for j in range(8):
-        #         text = ax.text(j, i, move_probs.reshape((8,8))[i, j],
-        #                        ha="center", va="center", color="w")
+        for row in range(8):
+            for col in range(8):
+                text = ax.text(col, row, round(move_probs.reshape((8,8))[row, col], 3),
+                               ha="center", va="center", color="w")
 
         ax.set_title("batch_{}".format(i))
         fig.tight_layout()
         print("Move Probs Shape:", move_probs.shape)
         print(move_probs.reshape((8,8)))
         if path:
+            # print("current_batch", i)
             fig.savefig(path + "/batch_{}".format(i) + ".png")
         else:
             fig.show()
@@ -227,7 +230,9 @@ class TrainPipeline():
         """run the training pipeline"""
         # make directory to save policy models
         # dir_path = os.getcwd() + '/' + 'batch{}_mini{}_model'.format(self.check_freq, self.batch_size)
-        path = os.getcwd() + '/' + 'testing_only'
+        datestring = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        path = os.getcwd() + "/" + "testing_only_" + datestring
+        
         if not os.path.exists(path):
             os.mkdir(path)
         os.chdir(path)
