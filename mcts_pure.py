@@ -156,7 +156,7 @@ class MCTS(object):
         else:
             return 1 if winner == player else -1
 
-    def get_move(self, state):
+    def get_move(self, state, counts=False):
         """Runs all playouts sequentially and returns the most visited action.
         state: the current game state
 
@@ -165,6 +165,11 @@ class MCTS(object):
         for n in range(self._n_playout):
             state_copy = copy.deepcopy(state)
             self._playout(state_copy)
+        if counts:
+            return (max(self._root._children.items(),
+                   key=lambda act_node: act_node[1]._n_visits)[0],
+                   np.array([n[1]._n_visits for n in self._root._children.items()]))
+
         return max(self._root._children.items(),
                    key=lambda act_node: act_node[1]._n_visits)[0]
 
@@ -193,10 +198,10 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, board):
+    def get_action(self, board, counts=False):
         sensible_moves = board.availables
         if len(sensible_moves) > 0:
-            move = self.mcts.get_move(board)
+            move = self.mcts.get_move(board, counts=counts)
             self.mcts.update_with_move(-1)
             return move
         else:
