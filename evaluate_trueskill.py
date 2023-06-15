@@ -28,10 +28,11 @@ def readModel():
     
     '''save model name and model file name to a dictionary'''
     
-    model_dir = 'batch100_mini2048_model'
+#     model_dir = 'batch150_mini2048_model'
+    model_dir = 'test'
     model_path = os.getcwd() + '/' + model_dir
-#     model_list = [files for root, dirs, files in os.walk(model_path)][0] # have two lists, second is empty
-    model_list = [f for f in os.listdir(model_path) if re.match('\d*_best.*', f)] # only take the best policy models
+    model_list = [files for root, dirs, files in os.walk(model_path)][0] # have two lists, second is empty
+#     model_list = [f for f in os.listdir(model_path) if re.match('\d*_best.*', f)] # only take the best policy models
     model_dict = {}
     for model in model_list:
 #         model_dict['model' + '_' + model.split('.')[0].split('_')[-1]] = model # PyTorch_model
@@ -53,13 +54,13 @@ def compete(model_file_1, model_file_2):
         # for pyTorch
         best_policy_1 = PolicyValueNet(width, height, model_file_1, use_gpu=True)
         mcts_player_1 = MCTSPlayer(best_policy_1.policy_value_fn,
-                                 c_puct=5,
-                                 n_playout=400)  # set larger n_playout for better performance
+                                 c_puct=0, # set cput=0, default is 5; only toward reward
+                                 n_playout=400)  # set larger n_playout for better performance, default=400
         
         best_policy_2 = PolicyValueNet(width, height, model_file_2, use_gpu=True)
         mcts_player_2 = MCTSPlayer(best_policy_2.policy_value_fn,
-                                 c_puct=5,
-                                 n_playout=400)  # set larger n_playout for better performance
+                                 c_puct=0,
+                                 n_playout=400)
 
         winner = game.start_play(mcts_player_1, mcts_player_2, start_player=1, is_shown=0)
         return winner
@@ -69,14 +70,21 @@ def compete(model_file_1, model_file_2):
         print('\n\rquit')
         
 def run_all():
+    
+#     model_dir = 'batch150_mini2048_model'
+    model_dir = 'test'
+    model_path = os.getcwd() + '/' + model_dir
+    
     model_dict = readModel()
     game_rst = {k: [] for k in ['model_1', 'model_2', 'winner']}
     
-    for i in range(10):
+    for i in range(2):
         game_cnt = 0
         for model_1 in model_dict.keys():
             for model_2 in model_dict.keys():
                 if model_1 == model_2:
+                    continue
+                if "best" not in model_1 and "best" not in model_2:
                     continue
                 
                 game_cnt += 1
