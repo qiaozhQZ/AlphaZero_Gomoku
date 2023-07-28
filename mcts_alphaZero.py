@@ -182,6 +182,29 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
+    def get_visits(self, state):
+        sensible_moves = state.availables
+        move_probs = np.zeros(state.width * state.height)
+        if len(sensible_moves) > 0:
+            for n in range(self.mcts._n_playout):
+                state_copy = copy.deepcopy(state)
+                self.mcts._playout(state_copy)
+
+            # calc the move probabilities based on visit counts at the root node
+            act_visits = [(act, node._n_visits)
+                          for act, node in self.mcts._root._children.items()]
+            acts, visits = zip(*act_visits)
+
+            # CHRIS: I think we need to reset root, right?
+            self.mcts.update_with_move(-1)
+
+            return list(acts), list(visits)
+        else:
+            print("WARNING: the board is full")
+
+    def get_probs_given_visits(self, visits, temp):
+        return softmax(1.0/temp * np.log(np.array(visits) + 1e-10))
+
     def get_action(self, board, temp=1e-3, return_prob=0):
         sensible_moves = board.availables
         # the pi vector returned by MCTS as in the alphaGo Zero paper
