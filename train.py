@@ -25,9 +25,19 @@ from multiprocessing import pool
 import torch
 
 def do_selfplay(args):
-    model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp = args
-    policy = PolicyValueNet(board_width, board_height,
-                               model_file=model_checkpoint, use_gpu=torch.cuda.is_available())
+    game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp = args
+    if torch.cuda.is_available():
+        num_devices = torch.cuda.device_count()
+        dev_id = game_num % num_devices
+        device = torch.device('cuda:{}'.format(dev_id))
+
+        with torch.cuda.device(device):
+            policy = PolicyValueNet(board_width, board_height,
+                                       model_file=model_checkpoint, use_gpu=True)
+    else:
+        policy = PolicyValueNet(board_width, board_height,
+                                   model_file=model_checkpoint, use_gpu=False)
+
     mcts_player = MCTSPlayer(policy.policy_value_fn,
                              alpha=alpha, c_puct=c_puct,
                              n_playout=n_playout, is_selfplay=1)
@@ -121,7 +131,7 @@ class TrainPipeline():
         model_checkpoint = os.getcwd() + '/temp.model'
         self.policy_value_net.save_model(model_checkpoint)
 
-        results = self.pool.map(do_selfplay, [(model_checkpoint, self.board_width,
+        results = self.pool.map(do_selfplay, [(i, model_checkpoint, self.board_width,
                                                self.board_height,
                                                self.n_in_row, self.alpha,
                                                self.c_puct, self.n_playout,
