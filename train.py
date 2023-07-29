@@ -34,11 +34,11 @@ class TrainPipeline():
                            n_in_row=self.n_in_row)
         self.game = Game(self.board)
         # training params
-        self.learn_rate = 2e-3
+        self.learn_rate = 2e-6
         self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.5  # the temperature param
         self.n_playout = 400  # num of simulations for each move
-        self.c_puct = 5
+        self.c_puct = 8
         self.buffer_size = 10000
         self.batch_size = 2048  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
@@ -56,12 +56,12 @@ class TrainPipeline():
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
                                                    model_file=init_model,
-                                                  use_gpu=True)
+                                                  use_gpu=False)
         else:
             # start training from a new policy-value net
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
-                                                  use_gpu=True)
+                                                  use_gpu=False)
         self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                       c_puct=self.c_puct,
                                       n_playout=self.n_playout,
@@ -200,7 +200,7 @@ class TrainPipeline():
             os.mkdir(path)
         empty_board = Board()
         empty_board.init_board()
-        acts, move_probs = self.mcts_player.get_action(empty_board, return_prob=1)
+        acts, move_probs = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
         
         fig, ax = plt.subplots()
         im = ax.imshow(move_probs.reshape((8,8)))
@@ -217,8 +217,8 @@ class TrainPipeline():
 
         ax.set_title("batch_{}".format(i))
         fig.tight_layout()
-        print("Move Probs Shape:", move_probs.shape)
-        print(move_probs.reshape((8,8)))
+        # print("Move Probs Shape:", move_probs.shape)
+        # print(move_probs.reshape((8,8)))
         if path:
             # print("current_batch", i)
             fig.savefig(path + "/batch_{}".format(i) + ".png")
