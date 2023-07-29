@@ -22,12 +22,12 @@ from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 # from policy_value_net_tensorflow import PolicyValueNet # Tensorflow
 # from policy_value_net_keras import PolicyValueNet # Keras
 from multiprocessing import pool
-
+import torch
 
 def do_selfplay(args):
     model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp = args
     policy = PolicyValueNet(board_width, board_height,
-                               model_file=model_checkpoint, use_gpu=False)
+                               model_file=model_checkpoint, use_gpu=torch.cuda.is_available())
     mcts_player = MCTSPlayer(policy.policy_value_fn,
                              alpha=alpha, c_puct=c_puct,
                              n_playout=n_playout, is_selfplay=1)
@@ -74,12 +74,12 @@ class TrainPipeline():
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
                                                    model_file=init_model,
-                                                  use_gpu=False)
+                                                  use_gpu=torch.cuda.is_available())
         else:
             # start training from a new policy-value net
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
-                                                  use_gpu=False)
+                                                  use_gpu=torch.cuda.is_available())
         self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                       alpha=self.alpha,
                                       c_puct=self.c_puct,
