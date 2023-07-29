@@ -202,10 +202,26 @@ class Game(object):
         self.board.init_board()
         p1, p2 = self.board.players
         states, mcts_probs, current_players = [], [], []
+
+        target_temp = 0.1
+        anneal_time = 30
+
+        temp_slope = 0
+        if temp > 0.1:
+            temp_slope = (temp - target_temp) / anneal_time
+
         while True:
+
+            # print("moving with temp", temp)
             move, move_probs = player.get_action(self.board,
                                                  temp=temp,
                                                  return_prob=1)
+
+            # anneal temp
+            if temp > 0.1:
+                temp -= temp_slope
+                temp = max(temp, 0.1)
+
             # store the data
             states.append(self.board.current_state())
             mcts_probs.append(move_probs)
