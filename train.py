@@ -26,28 +26,36 @@ import torch
 
 def do_selfplay(args):
     game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp = args
-    if torch.cuda.is_available():
-        num_devices = torch.cuda.device_count()
-        dev_id = game_num % num_devices
-        device = torch.device('cuda:{}'.format(dev_id))
-
-        with torch.cuda.device(device):
-            policy = PolicyValueNet(board_width, board_height,
-                                       model_file=model_checkpoint, use_gpu=True)
-    else:
-        policy = PolicyValueNet(board_width, board_height,
-                                   model_file=model_checkpoint, use_gpu=False)
-
-    mcts_player = MCTSPlayer(policy.policy_value_fn,
-                             alpha=alpha, c_puct=c_puct,
-                             n_playout=n_playout, is_selfplay=1)
 
     board = Board(width=board_width,
                   height=board_height,
                   n_in_row=n_in_row)
-
     game = Game(board)
-    return game.start_self_play(mcts_player, temp=temp)
+
+    if torch.cuda.is_available():
+        num_devices = torch.cuda.device_count()
+        dev_id = game_num % num_devices
+        device = torch.device('cuda:{}'.format(dev_id))
+        print('device', device)
+
+        with torch.cuda.device(device):
+            policy = PolicyValueNet(board_width, board_height,
+                                       model_file=model_checkpoint, use_gpu=True)
+
+            mcts_player = MCTSPlayer(policy.policy_value_fn,
+                                     alpha=alpha, c_puct=c_puct,
+                                     n_playout=n_playout, is_selfplay=1)
+
+            return game.start_self_play(mcts_player, temp=temp)
+    else:
+        policy = PolicyValueNet(board_width, board_height,
+                                   model_file=model_checkpoint, use_gpu=False)
+
+        mcts_player = MCTSPlayer(policy.policy_value_fn,
+                                 alpha=alpha, c_puct=c_puct,
+                                 n_playout=n_playout, is_selfplay=1)
+
+        return game.start_self_play(mcts_player, temp=temp)
 
 class TrainPipeline():
     def __init__(self, init_model=None):
@@ -69,7 +77,7 @@ class TrainPipeline():
         self.buffer_size = 10000
         self.batch_size = 4096  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
-        self.play_batch_size = 4
+        self.play_batch_size = 8
         self.epochs = 5  # num of train_steps for each update
         self.kl_targ = 0.02
         self.check_freq = 150 # num of games in a batch
