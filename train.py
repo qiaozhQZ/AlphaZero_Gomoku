@@ -24,38 +24,24 @@ from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 from multiprocessing import pool
 import torch
 
+use_gpu = True
+
 def do_selfplay(args):
-    game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp = args
+    game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp=args
 
     board = Board(width=board_width,
                   height=board_height,
                   n_in_row=n_in_row)
     game = Game(board)
 
-    if torch.cuda.is_available():
-        num_devices = torch.cuda.device_count()
-        dev_id = game_num % num_devices
-        device = torch.device('cuda:{}'.format(dev_id))
-        print('device', device)
+    policy = PolicyValueNet(board_width, board_height,
+                               model_file=model_checkpoint, use_gpu=False)
 
-        with torch.cuda.device(device):
-            policy = PolicyValueNet(board_width, board_height,
-                                       model_file=model_checkpoint, use_gpu=True)
+    mcts_player = MCTSPlayer(policy.policy_value_fn,
+                             alpha=alpha, c_puct=c_puct,
+                             n_playout=n_playout, is_selfplay=1)
 
-            mcts_player = MCTSPlayer(policy.policy_value_fn,
-                                     alpha=alpha, c_puct=c_puct,
-                                     n_playout=n_playout, is_selfplay=1)
-
-            return game.start_self_play(mcts_player, temp=temp)
-    else:
-        policy = PolicyValueNet(board_width, board_height,
-                                   model_file=model_checkpoint, use_gpu=False)
-
-        mcts_player = MCTSPlayer(policy.policy_value_fn,
-                                 alpha=alpha, c_puct=c_puct,
-                                 n_playout=n_playout, is_selfplay=1)
-
-        return game.start_self_play(mcts_player, temp=temp)
+    return game.start_self_play(mcts_player, temp=temp)
 
 class TrainPipeline():
     def __init__(self, init_model=None):
@@ -77,7 +63,7 @@ class TrainPipeline():
         self.buffer_size = 10000
         self.batch_size = 4096  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
-        self.play_batch_size = 8
+        self.play_batch_size = 4
         self.epochs = 5  # num of train_steps for each update
         self.kl_targ = 0.02
         self.check_freq = 150 # num of games in a batch
@@ -136,33 +122,36 @@ class TrainPipeline():
 #         with Pool(n_games) as p:
 #             roll_out = p.map(play_game, [self.mcts_player for i in range(n_games)])
 
-        model_checkpoint = os.getcwd() + '/temp.model'
-        self.policy_value_net.save_model(model_checkpoint)
-
-        results = self.pool.map(do_selfplay, [(i, model_checkpoint, self.board_width,
-                                               self.board_height,
-                                               self.n_in_row, self.alpha,
-                                               self.c_puct, self.n_playout,
-                                               self.temp)
-                                              for i in range(n_games)])
-
         self.episode_len = []
-        for winner, play_data in results:
-            play_data = list(play_data)[:]
-            self.episode_len.append(len(play_data))
-            # augment the data
-            play_data = self.get_equi_data(play_data)
-            self.data_buffer.extend(play_data)
 
-        # for i in range(n_games):
-        #     winner, play_data = self.game.start_self_play(self.mcts_player,
-        #                                                   temp=self.temp)
-#       #       winner, play_data = roll_out[i] # reading the data from roll_out
-        #     play_data = list(play_data)[:]
-        #     self.episode_len = len(play_data)
-        #     # augment the data
-        #     play_data = self.get_equi_data(play_data)
-        #     self.data_buffer.extend(play_data)
+        if not use_gpu:
+            model_checkpoint = os.getcwd() + '/temp.model'
+            self.policy_value_net.save_model(model_checkpoint)
+
+            results = self.pool.map(do_selfplay, [(i, model_checkpoint, self.board_width,
+                                                   self.board_height,
+                                                   self.n_in_row, self.alpha,
+                                                   self.c_puct, self.n_playout,
+                                                   self.temp)
+                                                  for i in range(n_games)])
+
+            for winner, play_data in results:
+                play_data = list(play_data)[:]
+                self.episode_len.append(len(play_data))
+                # augment the data
+                play_data = self.get_equi_data(play_data)
+                self.data_buffer.extend(play_data)
+
+        else:
+            for i in range(n_games):
+                winner, play_data = self.game.start_self_play(self.mcts_player,
+                                                              temp=self.temp)
+                # winner, play_data = roll_out[i] # reading the data from roll_out
+                play_data = list(play_data)[:]
+                self.episode_len.append(len(play_data))
+                # augment the data
+                play_data = self.get_equi_data(play_data)
+                self.data_buffer.extend(play_data)
 
     def policy_update(self):
         """update the policy-value net"""
