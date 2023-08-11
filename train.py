@@ -24,7 +24,7 @@ from policy_value_net_pytorch import PolicyValueNet  # Pytorch
 from multiprocessing import pool
 import torch
 
-use_gpu = True
+use_gpu = False
 
 def do_selfplay(args):
     game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp=args
@@ -54,22 +54,25 @@ class TrainPipeline():
                            n_in_row=self.n_in_row)
         self.game = Game(self.board)
         # training params
-        self.learn_rate = 2e-3
+        self.learn_rate = 2e-2
         self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.0  # the temperature param
         self.n_playout = 1600  # num of simulations for each move
-        self.c_puct = 8.0
+        self.c_puct = 5.0
         self.alpha = 10 / (self.board_width * self.board_height)
-        self.buffer_size = 10000
+        self.buffer_size = 20000
         self.batch_size = 4096  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
         self.play_batch_size = 4
         self.epochs = 5  # num of train_steps for each update
         self.kl_targ = 0.02
-        self.check_freq = 150 # num of games in a batch
+        self.check_freq = 50 # num of games in a batch
         self.game_batch_num = 3000 #maximun games played
         self.best_win_ratio = 0.0
-        self.pool = Pool(processes=self.play_batch_size)
+
+        if not use_gpu:
+            self.pool = Pool(processes=self.play_batch_size)
+
         # num of simulations used for the pure mcts, which is used as
         # the opponent to evaluate the trained policy
         self.pure_mcts_playout_num = 1000
@@ -78,12 +81,12 @@ class TrainPipeline():
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
                                                    model_file=init_model,
-                                                  use_gpu=torch.cuda.is_available())
+                                                  use_gpu=use_gpu)
         else:
             # start training from a new policy-value net
             self.policy_value_net = PolicyValueNet(self.board_width,
                                                    self.board_height,
-                                                  use_gpu=torch.cuda.is_available())
+                                                  use_gpu=use_gpu)
         self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                       alpha=self.alpha,
                                       c_puct=self.c_puct,
