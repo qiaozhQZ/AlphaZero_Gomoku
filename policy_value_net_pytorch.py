@@ -57,7 +57,7 @@ class Net(nn.Module):
                                   nn.ReLU())
 
         # 40 residual layers
-        self.residual_layer = []
+        self.residual_layer = nn.ModuleList()
         for i in range(self.n_residual_blocks):
             self.residual_layer.append(ResidualBlock(256, 256))
 
@@ -78,8 +78,8 @@ class Net(nn.Module):
     def forward(self, state_input):
         # common layers
         x = self.conv(state_input)
-        for i in range(self.n_residual_blocks):
-            x = self.residual_layer[i](x)
+        for layer in self.residual_layer:
+            x = layer(x)
 
         # action
         x_act = self.policy(x) 
