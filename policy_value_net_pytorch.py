@@ -49,18 +49,21 @@ class Net(nn.Module):
         self.board_width = board_width
         self.board_height = board_height
 
-        self.n_residual_blocks = 3
-        hidden_size = 64
+        self.n_residual_blocks = 0
+        hidden_size = 128
 
         # single convo layer
         self.conv = nn.Sequential(
-                nn.Conv2d(7, hidden_size, kernel_size=3, padding=1),
+                nn.Conv2d(7, hidden_size, kernel_size=9, padding=4),
+                                  nn.BatchNorm2d(hidden_size),
+                                  nn.ReLU(),
+                nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
                                   nn.BatchNorm2d(hidden_size),
                                   nn.ReLU(),
                                   )
 
         # 40 residual layers
-        self.residual_layer = nn.ModuleList()
+        self.residual_layer = []
         for i in range(self.n_residual_blocks):
             self.residual_layer.append(ResidualBlock(hidden_size, hidden_size, kernel_size=3))
 
@@ -81,8 +84,8 @@ class Net(nn.Module):
     def forward(self, state_input):
         # common layers
         x = self.conv(state_input)
-        for layer in self.residual_layer:
-            x = layer(x)
+        for i in range(self.n_residual_blocks):
+            x = self.residual_layer[i](x)
 
         # action
         x_act = self.policy(x) 
