@@ -41,7 +41,7 @@ def do_selfplay(args):
                              alpha=alpha, c_puct=c_puct,
                              n_playout=n_playout, is_selfplay=1)
 
-    return game.start_self_play(mcts_player, temp=temp)
+    return game.start_self_play(mcts_player, is_shown=0, temp=temp)
 
 class TrainPipeline():
     def __init__(self, init_model=None):
@@ -57,13 +57,13 @@ class TrainPipeline():
         self.learn_rate = 2e-2
         self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.0  # the temperature param
-        self.n_playout = 1600  # num of simulations for each move
-        self.c_puct = 5.0
+        self.n_playout = 400  # num of simulations for each move
+        self.c_puct = 3.0
         self.alpha = 10 / (self.board_width * self.board_height)
-        self.buffer_size = 20000
-        self.batch_size = 4096  # mini-batch size for training, 512 as default
+        self.buffer_size = 40000
+        self.batch_size = 2048  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
-        self.play_batch_size = 4
+        self.play_batch_size = 8
         self.epochs = 5  # num of train_steps for each update
         self.kl_targ = 0.02
         self.check_freq = 50 # num of games in a batch
@@ -249,6 +249,17 @@ class TrainPipeline():
             os.mkdir(path)
         empty_board = Board()
         empty_board.init_board()
+
+        # pure_mcts_player = MCTS_Pure(c_puct=1, n_playout=2000)
+        # move_probs = None
+
+        # for _ in range(20):
+        #     acts, mp = pure_mcts_player.get_action(empty_board, counts=True)
+        #     if move_probs is None:
+        #         move_probs = mp.copy()
+        #     else:
+        #         move_probs += mp
+
         acts, move_probs = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
         
         fig, ax = plt.subplots()
@@ -320,3 +331,5 @@ if __name__ == '__main__':
 #     training_pipeline = TrainPipeline('./best_policy_885_6050.model')
     training_pipeline = TrainPipeline()
     training_pipeline.run()
+
+    # training_pipeline.render_probs_empty(0, save=False)

@@ -22,16 +22,16 @@ def set_learning_rate(optimizer, lr):
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, kernel_size=3):
         super(ResidualBlock, self).__init__()
         self.conv = nn.Sequential(nn.Conv2d(in_channels, out_channels,
-                                            kernel_size=3,
-                                            padding=1),
+                                            kernel_size=kernel_size,
+                                            padding=(kernel_size-1)//2),
                                   nn.BatchNorm2d(out_channels),
                                   nn.ReLU(),
                                   nn.Conv2d(out_channels, out_channels,
-                                            kernel_size=3,
-                                            padding=1),
+                                            kernel_size=kernel_size,
+                                            padding=(kernel_size-1)//2),
                                   nn.BatchNorm2d(out_channels))
         self.relu = nn.ReLU()
 
@@ -49,31 +49,34 @@ class Net(nn.Module):
         self.board_width = board_width
         self.board_height = board_height
 
-        self.n_residual_blocks = 40
+        self.n_residual_blocks = 3
+        hidden_size = 64
 
         # single convo layer
-        self.conv = nn.Sequential(nn.Conv2d(4, 256, kernel_size=3, padding=1),
-                                  nn.BatchNorm2d(256),
-                                  nn.ReLU())
+        self.conv = nn.Sequential(
+                nn.Conv2d(7, hidden_size, kernel_size=3, padding=1),
+                                  nn.BatchNorm2d(hidden_size),
+                                  nn.ReLU(),
+                                  )
 
         # 40 residual layers
         self.residual_layer = []
         for i in range(self.n_residual_blocks):
-            self.residual_layer.append(ResidualBlock(256, 256))
+            self.residual_layer.append(ResidualBlock(hidden_size, hidden_size, kernel_size=3))
 
         # action policy layers
-        self.policy = nn.Sequential(nn.Conv2d(256, 2, kernel_size=1),
+        self.policy = nn.Sequential(nn.Conv2d(hidden_size, 2, kernel_size=1),
                                     nn.BatchNorm2d(2),
                                     nn.ReLU())
-        self.policy_fc1 = nn.Linear(2*board_width*board_height,
+        self.policy_fc1 = nn.Linear(2*(board_width)*(board_height),
                                     board_width*board_height)
 
         # state value layers
-        self.value = nn.Sequential(nn.Conv2d(256, 1, kernel_size=1),
+        self.value = nn.Sequential(nn.Conv2d(hidden_size, 1, kernel_size=1),
                                    nn.BatchNorm2d(1),
                                    nn.ReLU())
-        self.value_fc1 = nn.Linear(board_width*board_height, 256)
-        self.value_fc2 = nn.Linear(256, 1)
+        self.value_fc1 = nn.Linear(1*(board_width)*(board_height), hidden_size)
+        self.value_fc2 = nn.Linear(hidden_size, 1)
 
     def forward(self, state_input):
         # common layers
@@ -83,12 +86,12 @@ class Net(nn.Module):
 
         # action
         x_act = self.policy(x) 
-        x_act = x_act.view(-1, 2*self.board_width*self.board_height)
+        x_act = x_act.view(-1, 2*(self.board_width)*(self.board_height))
         x_act = F.log_softmax(self.policy_fc1(x_act), dim=-1) # add dim= -1
 
         # state value layers
         x_val = self.value(x)
-        x_val = x_val.view(-1, self.board_width*self.board_height)
+        x_val = x_val.view(-1, 1*(self.board_width)*(self.board_height))
         x_val = F.relu(self.value_fc1(x_val))
 #         x_val = torch.tanh(self.val_fc2(x_val)) # use torch.tanh
         x_val = self.value_fc2(x_val).tanh() # use torch.tanh
@@ -143,7 +146,7 @@ class PolicyValueNet():
         """
         legal_positions = board.availables
         current_state = np.ascontiguousarray(board.current_state().reshape(
-            -1, 4, self.board_width, self.board_height))
+            -1, 7, self.board_width, self.board_height))
         if self.use_gpu:
             log_act_probs, value = self.policy_value_net(
                     Variable(torch.from_numpy(current_state)).cuda().float())
