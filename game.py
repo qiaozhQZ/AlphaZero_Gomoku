@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 import numpy as np
+from scipy.signal import convolve2d
 
 
 class Board(object):
@@ -23,7 +24,7 @@ class Board(object):
 
     def __hash__(self) -> int:
         return hash(frozenset(self.states.items()))
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Board):
             return False
@@ -66,7 +67,7 @@ class Board(object):
         state shape: 4*width*height
         """
 
-        square_state = np.zeros((7, self.width, self.height))
+        square_state = np.zeros((9, self.width, self.height))
 
         if self.states:
             moves, players = np.array(list(zip(*self.states.items())))
@@ -85,14 +86,33 @@ class Board(object):
             # indicate the last move location
             square_state[3][self.last_move // self.width,
                             self.last_move % self.height] = 1.0
+
+            # get all legal moves
+            rows, cols = np.where(square_state[2] == 1)
+            coordinates = list(zip(rows, cols))
+
+            for x, y in list(zip(rows, cols)):
+                own = square_state[0].copy()
+                own[x,y] = 1.0
+
+                if self.is_five_in_a_row(own):
+                    # marks moves that win in 1
+                    square_state[4][x,y] = 1.0
+
+                opp = square_state[1].copy()
+                opp[x,y] = 1.0
+                if self.is_five_in_a_row(opp):
+                    # marks moves that lose in 1
+                    square_state[5][x,y] = 1.0
+
         if len(self.states) % 2 == 0:
-            square_state[4][:, :] = 1.0  # indicate the colour to play
+            square_state[6][:, :] = 1.0  # indicate the colour to play
 
         # plane of ones, marks playable area, to distinguish from padded regions
-        square_state[5][:, :] = 1.0
+        square_state[7][:, :] = 1.0
 
         # plane of zeros
-        square_state[6][:, :] = 0.0
+        square_state[8][:, :] = 0.0
 
         return square_state[:, ::-1, :]
 
@@ -100,10 +120,28 @@ class Board(object):
         self.states[move] = self.current_player
         self.availables.remove(move)
         self.current_player = (
-            self.players[0] if self.current_player == self.players[1]
-            else self.players[1]
-        )
+                self.players[0] if self.current_player == self.players[1]
+                else self.players[1]
+                )
         self.last_move = move
+
+    def is_five_in_a_row(self, matrix):
+        # Defining kernels for each direction
+       horizontal_kernel = np.array([[1, 1, 1, 1, 1]])
+       vertical_kernel = np.transpose(horizontal_kernel)
+       diag_tl_br_kernel = np.eye(5)
+       diag_bl_tr_kernel = np.flipud(np.eye(5))
+
+       instances = []
+
+       for kernel in [horizontal_kernel, vertical_kernel, diag_tl_br_kernel,
+                      diag_bl_tr_kernel]:
+           conv_result = convolve2d(matrix, kernel, mode='valid')
+           matches = np.column_stack(np.where(conv_result == 5))
+           if len(matches) > 0:
+               return True
+
+       return False
 
     def has_a_winner(self):
         width = self.width
@@ -121,19 +159,19 @@ class Board(object):
             player = states[m]
 
             if (w in range(width - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n))) == 1):
+                len(set(states.get(i, -1) for i in range(m, m + n))) == 1):
                 return True, player
 
             if (h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * width, width))) == 1):
+                len(set(states.get(i, -1) for i in range(m, m + n * width, width))) == 1):
                 return True, player
 
             if (w in range(width - n + 1) and h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * (width + 1), width + 1))) == 1):
+                len(set(states.get(i, -1) for i in range(m, m + n * (width + 1), width + 1))) == 1):
                 return True, player
 
             if (w in range(n - 1, width) and h in range(height - n + 1) and
-                    len(set(states.get(i, -1) for i in range(m, m + n * (width - 1), width - 1))) == 1):
+                len(set(states.get(i, -1) for i in range(m, m + n * (width - 1), width - 1))) == 1):
                 return True, player
 
         return False, -1
@@ -218,7 +256,7 @@ class Game(object):
         states, mcts_probs, current_players = [], [], []
 
         # target_temp = 0.1
-        # anneal_time = 8 # moves before we reach target temp 
+        # anneal_time = 8 # moves before we reach target temp
 
         # temp_slope = 0
         # if temp > 0.1:

@@ -49,23 +49,29 @@ class Net(nn.Module):
         self.board_width = board_width
         self.board_height = board_height
 
-        self.n_residual_blocks = 0
+        self.n_residual_blocks = 4
         hidden_size = 128
 
         # single convo layer
         self.conv = nn.Sequential(
-                nn.Conv2d(7, hidden_size, kernel_size=9, padding=4),
+                nn.Conv2d(9, hidden_size, kernel_size=3, padding=1),
                                   nn.BatchNorm2d(hidden_size),
                                   nn.ReLU(),
-                nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
-                                  nn.BatchNorm2d(hidden_size),
-                                  nn.ReLU(),
+                                  # nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
+                                  #                   nn.BatchNorm2d(hidden_size),
+                                  #                   nn.ReLU(),
+                                  # nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
+                                  #                   nn.BatchNorm2d(hidden_size),
+                                  #                   nn.ReLU(),
+                                  # nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
+                                  #                   nn.BatchNorm2d(hidden_size),
+                                  #                   nn.ReLU(),
                                   )
 
-        # 40 residual layers
-        self.residual_layer = []
-        for i in range(self.n_residual_blocks):
-            self.residual_layer.append(ResidualBlock(hidden_size, hidden_size, kernel_size=3))
+        # 10 residual layers
+        self.residual_layer = nn.ModuleList([ResidualBlock(hidden_size,
+                                                           hidden_size)
+                                             for _ in range(self.n_residual_blocks)])
 
         # action policy layers
         self.policy = nn.Sequential(nn.Conv2d(hidden_size, 2, kernel_size=1),
@@ -84,8 +90,8 @@ class Net(nn.Module):
     def forward(self, state_input):
         # common layers
         x = self.conv(state_input)
-        for i in range(self.n_residual_blocks):
-            x = self.residual_layer[i](x)
+        for block in self.residual_layer:
+            x = block(x)
 
         # action
         x_act = self.policy(x) 
@@ -149,7 +155,7 @@ class PolicyValueNet():
         """
         legal_positions = board.availables
         current_state = np.ascontiguousarray(board.current_state().reshape(
-            -1, 7, self.board_width, self.board_height))
+            -1, 9, self.board_width, self.board_height))
         if self.use_gpu:
             log_act_probs, value = self.policy_value_net(
                     Variable(torch.from_numpy(current_state)).cuda().float())
