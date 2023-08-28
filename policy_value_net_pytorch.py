@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
 
 
@@ -49,14 +48,26 @@ class Net(nn.Module):
         self.board_width = board_width
         self.board_height = board_height
 
-        self.n_residual_blocks = 4
-        hidden_size = 128
+        # self.n_residual_blocks = 10
+        hidden_size = 16
+
+        # common layers
+        self.conv1 = nn.Conv2d(9, hidden_size, kernel_size=9, padding=4)
+        self.bn1 = nn.BatchNorm2d(hidden_size)
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=9, padding=4)
+        self.bn2 = nn.BatchNorm2d(hidden_size)
+        # self.conv3 = nn.Conv2d(hidden_size, hidden_size, kernel_size=5, padding=2)
+        # self.bn3 = nn.BatchNorm2d(hidden_size)
+        # self.conv4 = nn.Conv2d(hidden_size, hidden_size, kernel_size=5, padding=2)
+        # self.bn4 = nn.BatchNorm2d(hidden_size)
+        # self.conv3 = nn.Conv2d(hidden_size, hidden_size, kernel_size=5, padding=2)
+        # self.conv4 = nn.Conv2d(hidden_size, hidden_size, kernel_size=5, padding=2)
 
         # single convo layer
-        self.conv = nn.Sequential(
-                nn.Conv2d(9, hidden_size, kernel_size=3, padding=1),
-                                  nn.BatchNorm2d(hidden_size),
-                                  nn.ReLU(),
+        # self.conv = nn.Sequential(
+        #         nn.Conv2d(9, hidden_size, kernel_size=3, padding=1),
+        #                           nn.BatchNorm2d(hidden_size),
+        #                           nn.ReLU(),
                                   # nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
                                   #                   nn.BatchNorm2d(hidden_size),
                                   #                   nn.ReLU(),
@@ -66,41 +77,52 @@ class Net(nn.Module):
                                   # nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1),
                                   #                   nn.BatchNorm2d(hidden_size),
                                   #                   nn.ReLU(),
-                                  )
+                                  # )
 
         # 10 residual layers
-        self.residual_layer = nn.ModuleList([ResidualBlock(hidden_size,
-                                                           hidden_size)
-                                             for _ in range(self.n_residual_blocks)])
+        # self.residual_layer = nn.ModuleList([ResidualBlock(hidden_size,
+        #                                                    hidden_size)
+        #                                      for _ in range(self.n_residual_blocks)])
 
         # action policy layers
-        self.policy = nn.Sequential(nn.Conv2d(hidden_size, 2, kernel_size=1),
-                                    nn.BatchNorm2d(2),
-                                    nn.ReLU())
-        self.policy_fc1 = nn.Linear(2*(board_width)*(board_height),
+        self.policy = nn.Conv2d(hidden_size, 4, kernel_size=1)
+        self.bn_policy = nn.BatchNorm2d(4)
+        # self.policy = nn.Sequential(nn.Conv2d(hidden_size, 2, kernel_size=1),
+        #                             nn.BatchNorm2d(2),
+        #                             nn.ReLU())
+        self.policy_fc1 = nn.Linear(4*(board_width)*(board_height),
                                     board_width*board_height)
 
         # state value layers
-        self.value = nn.Sequential(nn.Conv2d(hidden_size, 1, kernel_size=1),
-                                   nn.BatchNorm2d(1),
-                                   nn.ReLU())
-        self.value_fc1 = nn.Linear(1*(board_width)*(board_height), hidden_size)
-        self.value_fc2 = nn.Linear(hidden_size, 1)
+        self.value = nn.Conv2d(hidden_size, 2, kernel_size=1)
+        self.bn_value = nn.BatchNorm2d(2)
+        # self.value = nn.Sequential(nn.Conv2d(hidden_size, 1, kernel_size=1),
+        #                            nn.BatchNorm2d(1),
+        #                            nn.ReLU())
+        self.value_fc1 = nn.Linear(2*(board_width)*(board_height), 64)
+        self.value_fc2 = nn.Linear(64, 1)
 
     def forward(self, state_input):
-        # common layers
-        x = self.conv(state_input)
-        for block in self.residual_layer:
-            x = block(x)
+        # # common layers
+        # x = self.conv(state_input)
+        # for block in self.residual_layer:
+        #     x = block(x)
+
+        x = F.relu(self.bn1(self.conv1(state_input)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        # x = F.relu(self.bn3(self.conv3(x)))
+        # x = F.relu(self.bn4(self.conv4(x)))
+        # x = F.relu(self.conv3(x))
+        # x = F.relu(self.conv4(x))
 
         # action
-        x_act = self.policy(x) 
-        x_act = x_act.view(-1, 2*(self.board_width)*(self.board_height))
+        x_act = F.relu(self.bn_policy(self.policy(x)))
+        x_act = x_act.view(-1, 4*(self.board_width)*(self.board_height))
         x_act = F.log_softmax(self.policy_fc1(x_act), dim=-1) # add dim= -1
 
         # state value layers
-        x_val = self.value(x)
-        x_val = x_val.view(-1, 1*(self.board_width)*(self.board_height))
+        x_val = F.relu(self.bn_value(self.value(x)))
+        x_val = x_val.view(-1, 2*(self.board_width)*(self.board_height))
         x_val = F.relu(self.value_fc1(x_val))
 #         x_val = torch.tanh(self.val_fc2(x_val)) # use torch.tanh
         x_val = self.value_fc2(x_val).tanh() # use torch.tanh
@@ -136,16 +158,9 @@ class PolicyValueNet():
         input: a batch of states
         output: a batch of action probabilities and state values
         """
-        if self.use_gpu:
-            state_batch = Variable(torch.FloatTensor(state_batch).cuda())
-            log_act_probs, value = self.policy_value_net(state_batch)
-            act_probs = np.exp(log_act_probs.data.cpu().numpy())
-            return act_probs, value.data.cpu().numpy()
-        else:
-            state_batch = Variable(torch.FloatTensor(state_batch))
-            log_act_probs, value = self.policy_value_net(state_batch)
-            act_probs = np.exp(log_act_probs.data.numpy())
-            return act_probs, value.data.numpy()
+        log_act_probs, value = self.policy_value_net(state_batch)
+        act_probs = np.exp(log_act_probs.data.cpu().numpy())
+        return act_probs, value.data.cpu().numpy()
 
     def policy_value_fn(self, board):
         """
@@ -156,52 +171,49 @@ class PolicyValueNet():
         legal_positions = board.availables
         current_state = np.ascontiguousarray(board.current_state().reshape(
             -1, 9, self.board_width, self.board_height))
-        if self.use_gpu:
-            log_act_probs, value = self.policy_value_net(
-                    Variable(torch.from_numpy(current_state)).cuda().float())
-            act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
-        else:
-            log_act_probs, value = self.policy_value_net(
-                    Variable(torch.from_numpy(current_state)).float())
-            act_probs = np.exp(log_act_probs.data.numpy().flatten())
+
+        log_act_probs, value = self.policy_value_net(torch.from_numpy(current_state).float())
+        act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
+
+        # if self.use_gpu:
+        #     log_act_probs, value = self.policy_value_net(
+        #             Variable(torch.from_numpy(current_state)).cuda().float())
+        #     act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
+        # else:
+        #     log_act_probs, value = self.policy_value_net(
+        #             Variable(torch.from_numpy(current_state)).float())
+        #     act_probs = np.exp(log_act_probs.data.numpy().flatten())
+
         act_probs = zip(legal_positions, act_probs[legal_positions])
         value = value.data[0][0]
         return act_probs, value
 
-    def train_step(self, state_batch, mcts_probs, winner_batch, lr):
-        """perform a training step"""
-        # wrap in Variable
-        if self.use_gpu:
-            state_batch = Variable(torch.FloatTensor(state_batch).cuda())
-            mcts_probs = Variable(torch.FloatTensor(mcts_probs).cuda())
-            winner_batch = Variable(torch.FloatTensor(winner_batch).cuda())
-        else:
-            state_batch = Variable(torch.FloatTensor(state_batch))
-            mcts_probs = Variable(torch.FloatTensor(mcts_probs))
-            winner_batch = Variable(torch.FloatTensor(winner_batch))
-
-        # zero the parameter gradients
-        self.optimizer.zero_grad()
-        # set learning rate
+    def train_step(self, train_loader, lr, epochs=1):
         set_learning_rate(self.optimizer, lr)
 
-        # forward
-        log_act_probs, value = self.policy_value_net(state_batch)
-        # define the loss = (z - v)^2 - pi^T * log(p) + c||theta||^2
-        # Note: the L2 penalty is incorporated in optimizer
-        value_loss = F.mse_loss(value.view(-1), winner_batch)
-        policy_loss = -torch.mean(torch.sum(mcts_probs*log_act_probs, 1))
-        loss = value_loss + policy_loss
-        # backward and optimize
-        loss.backward()
-        self.optimizer.step()
-        # calc policy entropy, for monitoring only
-        entropy = -torch.mean(
-                torch.sum(torch.exp(log_act_probs) * log_act_probs, 1)
-                )
-#         return loss.data[0], entropy.data[0]
-        #for pytorch version >= 0.5 please use the following line instead.
-        return loss.item(), entropy.item()
+        for epoch in range(epochs):
+            total_loss = 0.0
+
+            for state_batch, mcts_probs, winner_batch in train_loader:
+                self.optimizer.zero_grad()
+
+                # forward
+                log_act_probs, value = self.policy_value_net(state_batch)
+                # define the loss = (z - v)^2 - pi^T * log(p) + c||theta||^2
+                # Note: the L2 penalty is incorporated in optimizer
+                value_loss = F.mse_loss(value.view(-1), winner_batch)
+                policy_loss = -torch.mean(torch.sum(mcts_probs*log_act_probs, 1))
+                loss = value_loss + policy_loss
+
+                # backward and optimize
+                loss.backward()
+                self.optimizer.step()
+
+                total_loss += loss.item()
+
+            total_loss /= len(train_loader)
+
+        return total_loss
 
     def get_policy_param(self):
         net_params = self.policy_value_net.state_dict()
