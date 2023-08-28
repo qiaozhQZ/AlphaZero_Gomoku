@@ -3,3 +3,4 @@ Flask-SQLAlchemy
 numpy
 matplotlib
 opencv-python
+pyyaml
