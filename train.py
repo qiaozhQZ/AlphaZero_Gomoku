@@ -179,7 +179,7 @@ class TrainPipeline():
                 self.episode_len.append(len(play_data))
                 # augment the data
                 play_data = self.get_equi_data(play_data)
-                self.data_buffer.extend(torch.tensor(play_data, dtype=torch.float).cuda())
+                self.data_buffer.extend(play_data)
 
     def policy_update(self):
         train_set = board_data(self.data_buffer)
