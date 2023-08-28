@@ -172,17 +172,14 @@ class PolicyValueNet():
         current_state = np.ascontiguousarray(board.current_state().reshape(
             -1, 9, self.board_width, self.board_height))
 
-        log_act_probs, value = self.policy_value_net(torch.from_numpy(current_state).float())
-        act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
-
-        # if self.use_gpu:
-        #     log_act_probs, value = self.policy_value_net(
-        #             Variable(torch.from_numpy(current_state)).cuda().float())
-        #     act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
-        # else:
-        #     log_act_probs, value = self.policy_value_net(
-        #             Variable(torch.from_numpy(current_state)).float())
-        #     act_probs = np.exp(log_act_probs.data.numpy().flatten())
+        if self.use_gpu:
+            log_act_probs, value = self.policy_value_net(
+                    torch.from_numpy(current_state).cuda().float())
+            act_probs = np.exp(log_act_probs.data.cpu().numpy().flatten())
+        else:
+            log_act_probs, value = self.policy_value_net(
+                    torch.from_numpy(current_state).float())
+            act_probs = np.exp(log_act_probs.data.numpy().flatten())
 
         act_probs = zip(legal_positions, act_probs[legal_positions])
         value = value.data[0][0]
