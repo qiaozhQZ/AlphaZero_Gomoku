@@ -40,7 +40,7 @@ class board_data(Dataset):
 
 
 def do_selfplay(args):
-    game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, c_puct, n_playout, temp=args
+    game_num, model_checkpoint, board_width, board_height, n_in_row, alpha, epsilon, c_puct, n_playout, temp = args
 
     board = Board(width=board_width,
                   height=board_height,
@@ -51,7 +51,7 @@ def do_selfplay(args):
                             model_file=model_checkpoint, use_gpu=False)
 
     mcts_player = MCTSPlayer(policy.policy_value_fn,
-                             alpha=alpha, c_puct=c_puct,
+                             alpha=alpha, epsilon=epsilon, c_puct=c_puct,
                              n_playout=n_playout, is_selfplay=1)
 
     return game.start_self_play(mcts_player, is_shown=0, temp=temp)
@@ -161,7 +161,7 @@ class TrainPipeline():
 
             results = self.pool.map(do_selfplay, [(i, model_checkpoint, self.board_width,
                                                    self.board_height,
-                                                   self.n_in_row, self.alpha,
+                                                   self.n_in_row, self.alpha, self.epsilon,
                                                    self.c_puct, self.n_playout,
                                                    self.temp)
                                                   for i in range(n_games)])
@@ -242,16 +242,21 @@ class TrainPipeline():
         empty_board = Board()
         empty_board.init_board()
 
+        mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
+                                 alpha=self.alpha, epsilon=self.epsilon,
+                                 c_puct=self.c_puct, n_playout=self.n_playout,
+                                 is_selfplay=0)
+
         move_probs2 = None
         for _ in range(1):
-            acts, mp = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
+            acts, mp = mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
             if move_probs2 is None:
                 move_probs2 = mp.copy()
             else:
                 move_probs2 += mp
 
         # acts, move_probs = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
-        move_probs, _ = self.mcts_player.mcts._policy(empty_board)
+        move_probs, _ = mcts_player.mcts._policy(empty_board)
         move_probs = np.array([v for _, v in move_probs])
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
