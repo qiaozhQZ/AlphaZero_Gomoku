@@ -172,9 +172,10 @@ class MCTSPlayer(object):
     """AI player based on MCTS"""
 
     def __init__(self, policy_value_function,
-                 c_puct=5, alpha=0.3, n_playout=2000, is_selfplay=0):
+                 c_puct=5, alpha=0.3, epsilon=0.25, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_function, c_puct, n_playout)
         self.alpha = alpha
+        self.epsilon = epsilon
         self._is_selfplay = is_selfplay
 
     def set_player_ind(self, p):
@@ -218,7 +219,7 @@ class MCTSPlayer(object):
                 # self-play training)
                 move = np.random.choice(
                     acts,
-                    p=0.75*probs + 0.25*np.random.dirichlet(self.alpha*np.ones(len(probs)))
+                    p=(1-self.epsilon)*probs + self.epsilon*np.random.dirichlet(self.alpha*np.ones(len(probs)))
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move)

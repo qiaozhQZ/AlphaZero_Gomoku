@@ -72,7 +72,9 @@ class TrainPipeline():
         self.temp = 1.0  # the temperature param
         self.n_playout = 400  # num of simulations for each move
         self.c_puct = 3.0
-        self.alpha = 10 / (self.board_width * self.board_height)
+        # self.alpha = 10 / (self.board_width * self.board_height)
+        self.alpha = 0.3
+        self.epsilon = 0.25
         self.buffer_size = 10000
         self.batch_size = 1024  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
@@ -103,6 +105,7 @@ class TrainPipeline():
 
         self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                       alpha=self.alpha,
+                                      epsilon=self.epsilon,
                                       c_puct=self.c_puct,
                                       n_playout=self.n_playout,
                                       is_selfplay=1)
@@ -239,32 +242,40 @@ class TrainPipeline():
         empty_board = Board()
         empty_board.init_board()
 
-        # pure_mcts_player = MCTS_Pure(c_puct=1, n_playout=2000)
-        # move_probs = None
+        move_probs2 = None
+        for _ in range(1):
+            acts, mp = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
+            if move_probs2 is None:
+                move_probs2 = mp.copy()
+            else:
+                move_probs2 += mp
 
-        # for _ in range(20):
-        #     acts, mp = pure_mcts_player.get_action(empty_board, counts=True)
-        #     if move_probs is None:
-        #         move_probs = mp.copy()
-        #     else:
-        #         move_probs += mp
+        # acts, move_probs = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
+        move_probs, _ = self.mcts_player.mcts._policy(empty_board)
+        move_probs = np.array([v for _, v in move_probs])
 
-        acts, move_probs = self.mcts_player.get_action(empty_board, temp=1.0, return_prob=1)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
-        fig, ax = plt.subplots()
-        im = ax.imshow(move_probs.reshape((8,8)))
+        im1 = ax1.imshow(move_probs.reshape((8,8)))
+        im2 = ax2.imshow(move_probs2.reshape((8,8)))
 
         row_label = [0 + i*8 for i in range(8)]
         col_label = [56 + i for i in range(8)]
-        ax.set_yticks(np.arange(len(row_label)), labels=row_label)
-        ax.set_xticks(np.arange(len(col_label)), labels=col_label)
+        ax1.set_yticks(np.arange(len(row_label)), labels=row_label)
+        ax1.set_xticks(np.arange(len(col_label)), labels=col_label)
+        ax2.set_yticks(np.arange(len(row_label)), labels=row_label)
+        ax2.set_xticks(np.arange(len(col_label)), labels=col_label)
 
         for row in range(8):
             for col in range(8):
-                text = ax.text(col, row, round(move_probs.reshape((8,8))[row, col], 3),
+                text1 = ax1.text(col, row, round(move_probs.reshape((8,8))[row, col], 3),
+                               ha="center", va="center", color="w")
+                text2 = ax2.text(col, row, round(move_probs2.reshape((8,8))[row, col], 3),
                                ha="center", va="center", color="w")
 
-        ax.set_title("batch_{}".format(i))
+        ax1.set_title("batch_{} (net probs)".format(i))
+        ax2.set_title("batch_{} (mcts counts)".format(i))
+
         fig.tight_layout()
         # print("Move Probs Shape:", move_probs.shape)
         # print(move_probs.reshape((8,8)))
@@ -294,6 +305,7 @@ class TrainPipeline():
                 'epochs': self.epochs,
                 'temp': self.temp,
                 'alpha': self.alpha,
+                'epsilon': self.epsilon,
                 'c_puct': self.c_puct,
                 'n_playout': self.n_playout,
                 'buffer_size': self.buffer_size
@@ -317,19 +329,22 @@ class TrainPipeline():
                     new_data_buffer.extend(self.data_buffer)
                     self.data_buffer = new_data_buffer
 
-                if (config['alpha'] != self.alpha or config['c_puct'] !=
-                    self.c_puct or config['n_playout'] != self.n_playout):
+                if (config['alpha'] != self.alpha or config['epsilon'] !=
+                    self.epsilon or config['c_puct'] != self.c_puct or
+                    config['n_playout'] != self.n_playout):
                     self.alpha = config['alpha']
+                    self.epsilon = config['epsilon']
                     self.c_puct = config['c_puct']
                     self.n_playout = config['n_playout']
 
                     self.mcts_player = MCTSPlayer(self.policy_value_net.policy_value_fn,
                                                   alpha=self.alpha,
+                                                  epsilon=self.epsilon,
                                                   c_puct=self.c_puct,
                                                   n_playout=self.n_playout,
                                                   is_selfplay=1)
 
-                print(("lr:{:.7f}, batch_size:{}, epochs:{}, temp:{}, c_puct:{}, n_playout:{}, alpha: {}, buffer_size: {}/{}, check_freq: {}").format(self.learn_rate, self.batch_size, self.epochs, self.temp, self.c_puct, self.n_playout, self.alpha, len(self.data_buffer), self.buffer_size, self.check_freq))
+                print(("lr:{:.7f}, batch_size:{}, epochs:{}, temp:{}, c_puct:{}, n_playout:{}, alpha: {}, epsilon: {}, buffer_size: {}/{}, check_freq: {}").format(self.learn_rate, self.batch_size, self.epochs, self.temp, self.c_puct, self.n_playout, self.alpha, self.epsilon, len(self.data_buffer), self.buffer_size, self.check_freq))
 
                 self.render_probs_empty(i, save=True)
 #             for i in range(self.game_batch_num):
@@ -359,8 +374,8 @@ class TrainPipeline():
 
 
 if __name__ == '__main__':
-    # training_pipeline = TrainPipeline('./testing_only_2023-08-27_153627/temp.model')
-    training_pipeline = TrainPipeline()
+    training_pipeline = TrainPipeline('./testing_only_2023-08-28_143031/temp.model')
+    # training_pipeline = TrainPipeline()
     training_pipeline.run()
 
     # training_pipeline.render_probs_empty(0, save=False)
