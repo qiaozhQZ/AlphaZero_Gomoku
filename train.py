@@ -67,15 +67,15 @@ class TrainPipeline():
                            n_in_row=self.n_in_row)
         self.game = Game(self.board)
         # training params
-        self.learn_rate = 2e-4
+        self.learn_rate = 2e-2
         # self.lr_multiplier = 1.0  # adaptively adjust the learning rate based on KL
         self.temp = 1.0  # the temperature param
         self.n_playout = 400  # num of simulations for each move
         self.c_puct = 3.0
         # self.alpha = 10 / (self.board_width * self.board_height)
-        self.alpha = 0.3
+        self.alpha = 0.15
         self.epsilon = 0.25
-        self.buffer_size = 10000
+        self.buffer_size = 5120
         self.batch_size = 1024  # mini-batch size for training, 512 as default
         self.data_buffer = deque(maxlen=self.buffer_size)
         self.play_batch_size = 8
@@ -306,6 +306,7 @@ class TrainPipeline():
             f.write(yaml.dump({
                 'learn_rate': self.learn_rate,
                 'batch_size': self.batch_size,
+                'play_batch_size': self.play_batch_size,
                 'check_freq': self.check_freq,
                 'epochs': self.epochs,
                 'temp': self.temp,
@@ -324,6 +325,7 @@ class TrainPipeline():
                     config = yaml.safe_load(f)
                 self.learn_rate = config['learn_rate']
                 self.batch_size = config['batch_size']
+                self.play_batch_size = config['play_batch_size']
                 self.check_freq = config['check_freq']
                 self.epochs = config['epochs']
                 self.temp = config['temp']
@@ -379,8 +381,8 @@ class TrainPipeline():
 
 
 if __name__ == '__main__':
-    training_pipeline = TrainPipeline('./testing_only_2023-08-28_143031/temp.model')
-    # training_pipeline = TrainPipeline()
+    # training_pipeline = TrainPipeline('./testing_only_2023-08-28_143031/temp.model')
+    training_pipeline = TrainPipeline()
     training_pipeline.run()
 
     # training_pipeline.render_probs_empty(0, save=False)
