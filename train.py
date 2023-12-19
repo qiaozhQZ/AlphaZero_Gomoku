@@ -26,7 +26,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import yaml
 
-use_gpu = False
+use_gpu = True
 
 class board_data(Dataset):
     def __init__(self, data_buffer):
